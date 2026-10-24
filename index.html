@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CircleMapper – Калькулятор круговых координат</title>
+<style>
+:root{
+  --bg:#f3f4f7;--panel:#fff;--text:#1c2230;--muted:#5d6579;--border:#d8dce5;--field:#fff;
+  --canvas:#fff;--axis:#6a7285;--x:#d0192b;--y:#0f7d38;--accent:#5b3fd0;
+}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --bg:#171a21;--panel:#222733;--text:#e8ebf2;--muted:#9aa3b8;--border:#363d4e;--field:#1a1e28;
+  --canvas:#1a1e28;--axis:#9aa3b8;--x:#ff7b7b;--y:#5fdc78;--accent:#b4a0ff;
+}}
+:root[data-theme=dark]{
+  --bg:#171a21;--panel:#222733;--text:#e8ebf2;--muted:#9aa3b8;--border:#363d4e;--field:#1a1e28;
+  --canvas:#1a1e28;--axis:#9aa3b8;--x:#ff7b7b;--y:#5fdc78;--accent:#b4a0ff;
+}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px);background:var(--bg)}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;padding:16px;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,"Segoe UI",Arial,sans-serif}
+h1{font-size:1.4rem;margin:0 0 14px}
+.layout{display:grid;grid-template-columns:minmax(340px,460px) minmax(320px,640px);gap:16px;align-items:start}
+@media(max-width:920px){.layout{grid-template-columns:1fr}}
+.panel,.canvaswrap{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px}
+.canvaswrap{padding:8px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--muted)}
+input[type=number],select{width:100%;min-height:42px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--field);color:var(--text);font:inherit;font-size:16px}
+output{display:flex;align-items:center;min-height:42px;padding:0 10px;border-radius:6px;background:var(--bg);color:var(--text);font-size:1.25rem;font-weight:700;font-style:italic}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.check{display:flex;align-items:center;gap:10px;margin-top:12px;cursor:pointer;min-height:28px}
+input[type=checkbox],input[type=radio]{width:20px;height:20px;accent-color:var(--accent);margin:0}
+#angleInputs{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-top:10px}
+#angleInputs label{font-size:.8rem;color:var(--muted);display:flex;flex-direction:column;gap:2px}
+.seg{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:14px;align-items:center}
+.seg>span{font-size:.85rem;color:var(--muted);width:100%}
+.seg label{display:flex;align-items:center;gap:6px;cursor:pointer;min-height:28px}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+button{min-height:42px;padding:6px 14px;border:1px solid var(--border);border-radius:6px;background:var(--field);color:var(--text);font:inherit;cursor:pointer}
+button:hover{border-color:var(--accent)}
+#error{color:var(--x);min-height:1.2em;margin-top:8px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;margin-top:6px}
+th{font-weight:600;font-size:.8rem;color:var(--muted);text-align:right;padding:4px 8px;border-bottom:2px solid var(--border)}
+th.hx{color:var(--x);font-size:1.1rem}th.hy{color:var(--y);font-size:1.1rem}
+td{text-align:right;padding:8px;border-bottom:1px solid var(--border)}
+th:first-child,td:first-child{text-align:left}
+.b{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;border-radius:15px;background:var(--text);color:var(--panel);font-weight:700;font-size:1rem}
+td.x,td.y{font-size:1.6rem;font-weight:700;white-space:nowrap}
+td.x{color:var(--x)}td.y{color:var(--y)}
+td.a{color:var(--accent);font-size:1rem;font-weight:600}
+tbody tr{cursor:pointer}
+tbody tr:hover,tbody tr.on{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+canvas{display:block;width:100%;border-radius:6px}
+.hint{font-size:.85rem;color:var(--muted);margin:8px 6px 2px}
+@media(max-width:520px){
+  body{padding:8px}
+  .panel{padding:12px}
+  td{padding:7px 3px}
+  th{padding:4px 3px}
+  td.x,td.y{font-size:1.3rem}
+  td.a{font-size:.9rem}
+  .b{min-width:28px;height:28px}
+}
+</style>
+</head>
+<body>
+<h1>CircleMapper – Калькулятор круговых координат</h1>
+
+<div class="layout">
+<section class="panel" id="panel">
+  <div class="grid">
+    <label class="f">Радиус окружности
+      <input type="number" id="radius" value="50" min="0" step="any"></label>
+    <label class="f">Диаметр
+      <output id="diam">Ø 100</output></label>
+    <label class="f">Количество точек
+      <input type="number" id="numPoints" value="5" min="1" max="360" step="1"></label>
+    <label class="f">Начальный угол (°)
+      <input type="number" id="startingAngle" value="0" step="any"></label>
+  </div>
+
+  <label class="check"><input type="checkbox" id="individualAngles"> Задать углы для каждой точки</label>
+  <div id="angleInputs" hidden></div>
+
+  <div class="seg">
+    <span>Углы на чертеже</span>
+    <label><input type="radio" name="am" value="none"> нет</label>
+    <label><input type="radio" name="am" value="from" checked> от нуля</label>
+    <label><input type="radio" name="am" value="between"> между точками</label>
+  </div>
+  <label class="check"><input type="checkbox" id="showCoords" checked> Координаты у точек на чертеже</label>
+
+  <div class="grid" style="margin-top:14px">
+    <label class="f">Знаков после запятой
+      <select id="precision"><option>0</option><option>1</option><option selected>2</option><option>3</option><option>4</option><option>6</option></select></label>
+  </div>
+
+  <div class="btns">
+    <button id="copyXY">Копировать координаты</button>
+    <button id="themeBtn">Тема</button>
+  </div>
+  <div id="error" role="alert"></div>
+
+  <table>
+    <thead><tr><th>Точка</th><th class="hx">X</th><th class="hy">Y</th><th>Угол</th><th id="thDelta">До след.</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</section>
+
+<section class="canvaswrap" id="wrap">
+  <canvas id="circleCanvas"></canvas>
+  <p class="hint">Углы отсчитываются от верхней оси Y (0°) по часовой стрелке. Нажмите на точку или строку таблицы, чтобы показать сектор от нуля. Если точек много, подписи координат на чертеже скрываются – смотрите таблицу.</p>
+</section>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const D2R = Math.PI / 180;
+const cv = $('circleCanvas'), ctx = cv.getContext('2d');
+const F = 'system-ui, "Segoe UI", Arial, sans-serif';
+
+let pts = [], radius = 0, hover = -1, pinned = -1, L = {}, C = {}, lastW = 0;
+
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const mod360 = v => { v = Math.round(v * 1e9) / 1e9; return ((v % 360) + 360) % 360; };
+const clean = v => Math.abs(v) < 1e-9 ? 0 : v;
+const fmtA = v => parseFloat(v.toFixed(2)) + '°';
+const prec = () => parseInt($('precision').value);
+const num = v => clean(v).toFixed(prec());
+const nPoints = () => Math.min(360, Math.max(1, parseInt($('numPoints').value) || 1));
+const angleMode = () => document.querySelector('input[name=am]:checked').value;
+
+/* ---------- поля углов для каждой точки ---------- */
+function buildAngleInputs() {
+  const box = $('angleInputs'), ind = $('individualAngles').checked;
+  const old = {};
+  box.querySelectorAll('input').forEach(e => old[e.id] = e.value);
+  box.innerHTML = '';
+  box.hidden = !ind;
+  if (!ind) return;
+  const n = nPoints(), start = parseFloat($('startingAngle').value) || 0;
+  for (let i = 0; i < n; i++) {
+    const id = 'angle_' + i;
+    const v = old[id] ?? String(parseFloat(mod360(start + 360 / n * i).toFixed(2)));
+    const l = document.createElement('label');
+    l.innerHTML = `Угол точки ${i + 1}<input type="number" id="${id}" step="any" value="${v}">`;
+    box.appendChild(l);
+  }
+}
+
+/* ---------- расчёт (логика прежняя: по часовой, 0° = X:0, Y:R) ---------- */
+function compute() {
+  const R = parseFloat($('radius').value), n = nPoints();
+  const start = parseFloat($('startingAngle').value) || 0;
+  const ind = $('individualAngles').checked;
+  if (!(R > 0)) return null;
+  radius = R;
+  const th = [];
+  for (let i = 0; i < n; i++) {
+    th.push(ind ? (parseFloat($('angle_' + i)?.value) || 0) : start + 360 / n * i);
+  }
+  return th.map((t, i) => {
+    const a = Math.PI / 2 - t * D2R;
+    return {
+      i, theta: mod360(t),
+      delta: n > 1 ? mod360(th[(i + 1) % n] - t) : 360,
+      x: clean(R * Math.cos(a)), y: clean(R * Math.sin(a))
+    };
+  });
+}
+
+/* ---------- таблица ---------- */
+function renderTable() {
+  const showDelta = angleMode() === 'between';
+  $('thDelta').hidden = !showDelta;
+  $('rows').innerHTML = pts.map(p => `<tr data-i="${p.i}">
+    <td><span class="b">${p.i + 1}</span></td><td class="x">${num(p.x)}</td><td class="y">${num(p.y)}</td>
+    <td class="a">${fmtA(p.theta)}</td>${showDelta ? `<td class="a">${fmtA(p.delta)}</td>` : ''}</tr>`).join('');
+  const canHover = matchMedia('(hover: hover)').matches;
+  $('rows').querySelectorAll('tr').forEach(tr => {
+    const i = +tr.dataset.i;
+    if (canHover) {
+      tr.onmouseenter = () => { hover = i; draw(); };
+      tr.onmouseleave = () => { hover = -1; draw(); };
+    }
+    tr.onclick = () => { pinned = pinned === i ? -1 : i; markRows(); draw(); };
+  });
+  markRows();
+}
+function markRows() {
+  $('rows').querySelectorAll('tr').forEach(tr => tr.classList.toggle('on', +tr.dataset.i === pinned));
+}
+
+/* ---------- геометрия и размеры чертежа (под ширину экрана) ---------- */
+const ca = deg => -Math.PI / 2 + deg * D2R;           // угол от верха по часовой -> угол canvas
+const P = (r, a) => [L.cx + r * Math.cos(a), L.cy + r * Math.sin(a)];
+
+function layout() {
+  const cssW = Math.max(260, Math.floor($('wrap').clientWidth - 16));
+  const big = cssW >= 520;
+  const fC = big ? 20 : 16;                  // шрифт координат
+  const bR = Math.round(fC * 0.85);          // радиус кружка с номером
+  const lh = fC + 5;                         // высота строки координат
+  const showC = $('showCoords').checked;
+  let w = 0;
+  ctx.font = `700 ${fC}px ${F}`;
+  if (showC) pts.forEach(p => {
+    w = Math.max(w, ctx.measureText('X ' + num(p.x)).width, ctx.measureText('Y ' + num(p.y)).width);
+  });
+  const off = bR + 10;                       // центр кружка за контуром
+  const half = Math.max(bR, w / 2) + 4;
+  const R = Math.max(70, Math.min(Math.floor(cssW / 2 - half - off), big ? 215 : 400));
+  const blockH = showC ? 2 * lh + 4 : 0;
+  const topM = off + bR + blockH + 6;
+  const cy = topM + R;
+  const yd = cy + R + topM + 30;             // размерная линия диаметра
+  L = { cssW, H: yd + 80, cx: cssW / 2, cy, R, fC, bR, lh, off, w, fA: fC - 2, yd, showC };
+}
+
+function label(t, x, y, color, align = 'center', font = `600 14px ${F}`) {
+  ctx.font = font; ctx.textAlign = align; ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round'; ctx.lineWidth = 5; ctx.strokeStyle = C.canvas;
+  ctx.strokeText(t, x, y);
+  ctx.fillStyle = color; ctx.fillText(t, x, y);
+}
+function arrowHead(x, y, dir, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.moveTo(x, y);
+  ctx.lineTo(x - 13 * Math.cos(dir - .17), y - 13 * Math.sin(dir - .17));
+  ctx.lineTo(x - 13 * Math.cos(dir + .17), y - 13 * Math.sin(dir + .17));
+  ctx.closePath(); ctx.fill();
+}
+const hit = (a, b) => !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y);
+
+/* ---------- рисование ---------- */
+function draw() {
+  C = { canvas: css('--canvas'), axis: css('--axis'), text: css('--text'),
+        x: css('--x'), y: css('--y'), acc: css('--accent') };
+  layout();
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  const bw = Math.round(L.cssW * dpr), bh = Math.round(L.H * dpr);
+  if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; }
+  cv.style.height = L.H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = C.canvas; ctx.fillRect(0, 0, L.cssW, L.H);
+  if (!pts.length) return;
+
+  const { cx, cy, R, fC, bR, lh, off, fA } = L;
+  const n = pts.length, mode = angleMode();
+  const active = hover >= 0 ? hover : pinned;
+  // занятые места под подписи углов: сначала отверстия с центровыми крестами
+  const placed = pts.map(p => { const [x, y] = P(R, ca(p.theta)); return { x: x - 16, y: y - 16, w: 32, h: 32 }; });
+
+  // размер диаметра (рисуем первым, чтобы подписи были поверх)
+  const xl = cx - R, xr = cx + R, yd = L.yd;
+  ctx.strokeStyle = C.text; ctx.lineWidth = 1; ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(xl, cy + 12); ctx.lineTo(xl, yd + 8);
+  ctx.moveTo(xr, cy + 12); ctx.lineTo(xr, yd + 8);
+  ctx.moveTo(xl, yd); ctx.lineTo(xr, yd);
+  ctx.stroke();
+  arrowHead(xl, yd, Math.PI, C.text);
+  arrowHead(xr, yd, 0, C.text);
+  label('Ø' + parseFloat((radius * 2).toFixed(prec())), cx, yd - 17, C.text, 'center', `italic 700 ${fC + 3}px ${F}`);
+
+  // осевые линии (штрих-пунктир)
+  ctx.strokeStyle = C.axis; ctx.lineWidth = 1; ctx.setLineDash([16, 4, 3, 4]);
+  ctx.beginPath();
+  ctx.moveTo(cx - R - 18, cy); ctx.lineTo(cx + R + 18, cy);
+  ctx.moveTo(cx, cy - R - 18); ctx.lineTo(cx, cy + R + 18);
+  ctx.stroke(); ctx.setLineDash([]);
+
+  // контур окружности
+  ctx.strokeStyle = C.text; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+
+  // нулевой луч
+  if (mode !== 'none') {
+    ctx.strokeStyle = C.acc; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy - R); ctx.stroke();
+  }
+
+  // лучи к точкам
+  if (mode !== 'none') {
+    ctx.strokeStyle = C.acc; ctx.globalAlpha = 0.5; ctx.lineWidth = 1;
+    pts.forEach(p => {
+      const [x, y] = P(R, ca(p.theta));
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(x, y); ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  // подпись с проверкой наложения: пробует радиусы по очереди, иначе не рисует
+  const tryPlace = (text, a, radii, size) => {
+    const font = `700 ${size}px ${F}`;
+    ctx.font = font;
+    const w = ctx.measureText(text).width + 8, h = size * 1.3;
+    for (const r of radii) {
+      const [x, y] = P(r, a), rc = { x: x - w / 2, y: y - h / 2, w, h };
+      if (!placed.some(q => hit(q, rc))) { placed.push(rc); label(text, x, y, C.acc, 'center', font); return; }
+    }
+  };
+
+  // сектор выбранной точки (от нуля) – подпись ставится первой, имеет приоритет
+  if (active >= 0 && pts[active] && pts[active].theta > 0) {
+    const p = pts[active], a1 = ca(p.theta);
+    ctx.fillStyle = C.acc; ctx.globalAlpha = 0.13;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, ca(0), a1); ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = C.acc; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(cx, cy, R * 0.3, ca(0), a1); ctx.stroke();
+    tryPlace(fmtA(p.theta), ca(p.theta / 2), [R * 0.3 + fA * 1.2, R * 0.3 + fA * 2.6], fA);
+  }
+
+  if (mode === 'from') {
+    pts.forEach(p => { if (p.i === active && p.theta > 0) return; tryPlace(fmtA(p.theta), ca(p.theta), [R * 0.68, R * 0.52, R * 0.38], fA); });
+  }
+  if (mode === 'between') {
+    const rb = R * 0.64;
+    pts.forEach(p => {
+      const gap = n > 1 && p.delta > 3 ? 1 : 0;
+      ctx.strokeStyle = C.acc; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(cx, cy, rb, ca(p.theta + gap), ca(p.theta + p.delta - gap)); ctx.stroke();
+    });
+    pts.forEach(p => tryPlace(fmtA(p.delta), ca(p.theta + p.delta / 2), [rb - fA * 1.2, rb - fA * 2.6, rb + fA * 1.3], fA));
+  }
+
+  // центр
+  ctx.fillStyle = C.text; ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
+
+  // отверстия: окружность + центровой крест
+  pts.forEach(p => {
+    const [x, y] = P(R, ca(p.theta)), isA = p.i === active;
+    ctx.fillStyle = C.canvas; ctx.strokeStyle = isA ? C.acc : C.text; ctx.lineWidth = isA ? 3 : 2;
+    ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.lineWidth = 1.2; ctx.strokeStyle = C.axis;
+    ctx.beginPath(); ctx.moveTo(x - 13, y); ctx.lineTo(x + 13, y); ctx.moveTo(x, y - 13); ctx.lineTo(x, y + 13); ctx.stroke();
+  });
+
+  // номера (кружки) и координаты
+  const info = pts.map(p => {
+    const a = ca(p.theta), [bx, by] = P(R + off, a);
+    return { p, a, bx, by, up: Math.sin(a) < 0.1 };
+  });
+  const used = info.map(o => ({ x: o.bx - bR, y: o.by - bR, w: 2 * bR, h: 2 * bR }));
+  info.forEach((o, k) => {
+    // номер в залитом кружке: контрастный, не сливается с красным и зелёным
+    ctx.fillStyle = C.text; ctx.beginPath(); ctx.arc(o.bx, o.by, bR, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = C.canvas; ctx.font = `700 ${Math.round(fC * 0.95)}px ${F}`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(String(o.p.i + 1), o.bx, o.by + 1);
+    if (!L.showC) return;
+    const bwid = L.w + 6, bhei = 2 * lh;
+    const top = o.up ? o.by - bR - 4 - bhei : o.by + bR + 4;
+    let bxc = Math.min(Math.max(o.bx, bwid / 2 + 2), L.cssW - bwid / 2 - 2);
+    const rc = { x: bxc - bwid / 2, y: top, w: bwid, h: bhei };
+    if (used.some((q, j) => j !== k && hit(q, rc))) return;       // тесно – оставляем только номер
+    used.push(rc);
+    label('X ' + num(o.p.x), bxc, top + lh / 2, C.x, 'center', `700 ${fC}px ${F}`);
+    label('Y ' + num(o.p.y), bxc, top + lh * 1.5, C.y, 'center', `700 ${fC}px ${F}`);
+  });
+
+  // индикатор осей X / Y
+  const ox = 14, oy = L.H - 14;
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = C.x; ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox + 40, oy); ctx.stroke();
+  arrowHead(ox + 50, oy, 0, C.x);
+  ctx.strokeStyle = C.y; ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox, oy - 40); ctx.stroke();
+  arrowHead(ox, oy - 50, -Math.PI / 2, C.y);
+  label('X', ox + 62, oy, C.x, 'left', `700 ${fC}px ${F}`);
+  label('Y', ox, oy - 64, C.y, 'center', `700 ${fC}px ${F}`);
+}
+
+/* ---------- обновление ---------- */
+function update() {
+  const r = parseFloat($('radius').value);
+  $('diam').textContent = r > 0 ? 'Ø ' + parseFloat((r * 2).toFixed(prec())) : '—';
+  pts = compute();
+  $('error').textContent = pts ? '' : 'Введите радиус больше 0.';
+  if (!pts) { pts = []; $('rows').innerHTML = ''; }
+  if (pinned >= pts.length) pinned = -1;
+  renderTable(); draw();
+}
+
+$('panel').addEventListener('input', e => {
+  if (e.target.id === 'numPoints' || e.target.id === 'individualAngles') buildAngleInputs();
+  update();
+});
+
+// точка под пальцем/курсором (и сам кружок с номером, и отверстие)
+function pointAt(e) {
+  const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  let best = -1, bd = 26;
+  pts.forEach(p => {
+    const a = ca(p.theta);
+    [P(L.R, a), P(L.R + L.off, a)].forEach(([x, y]) => {
+      const d = Math.hypot(x - mx, y - my);
+      if (d < bd) { bd = d; best = p.i; }
+    });
+  });
+  return best;
+}
+if (matchMedia('(hover: hover)').matches) {
+  cv.addEventListener('mousemove', e => {
+    const b = pointAt(e);
+    if (b !== hover) { hover = b; cv.style.cursor = b >= 0 ? 'pointer' : 'default'; draw(); }
+  });
+  cv.addEventListener('mouseleave', () => { hover = -1; draw(); });
+}
+cv.addEventListener('click', e => {
+  const b = pointAt(e);
+  pinned = b >= 0 && b !== pinned ? b : -1;
+  markRows(); draw();
+});
+
+$('themeBtn').onclick = () => {
+  const d = document.documentElement;
+  const dark = d.dataset.theme ? d.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  d.dataset.theme = dark ? 'light' : 'dark';
+  draw();
+};
+
+async function copyText(t, btn) {
+  try { await navigator.clipboard.writeText(t); }
+  catch { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  const o = btn.textContent; btn.textContent = 'Скопировано ✓';
+  setTimeout(() => btn.textContent = o, 1200);
+}
+$('copyXY').onclick = e => copyText(pts.map(p => `${p.i + 1}: X ${num(p.x)}, Y ${num(p.y)}`).join('\n'), e.target);
+
+// перерисовка при смене ширины (поворот телефона, изменение окна)
+new ResizeObserver(() => {
+  const w = $('wrap').clientWidth;
+  if (w !== lastW) { lastW = w; draw(); }
+}).observe($('wrap'));
+
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', draw);
+buildAngleInputs();
+update();
+</script>
+</body>
+</html>
